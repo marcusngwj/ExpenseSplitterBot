@@ -17,9 +17,15 @@ def on_chat_message(msg):
 			
 		if textFromUser == '/start':
 			bot.sendMessage(chatId, 'hello')
-				
+			
 
-MessageLoop(bot, {'chat': on_chat_message}).run_as_thread()
+def on_callback_query(msg):
+	queryId, fromId, queryData = telepot.glance(msg, flavor='callback_query')
+	print('Callback Query:', queryId, fromId, queryData)
+
+
+MessageLoop(bot, {'chat': on_chat_message,
+				  'callback_query': on_callback_query}).run_as_thread()
 print('Listening ...')
 
 #Keep the program running
