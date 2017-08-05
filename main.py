@@ -14,13 +14,15 @@ def on_chat_message(msg):
 		textFromUser = msg['text']
 			
 		if textFromUser == '/start':
-			bot.sendMessage(chatId, 'hello')
+			bot.sendMessage(chatId, startMessage)
 			
 
 def on_callback_query(msg):
 	queryId, fromId, queryData = telepot.glance(msg, flavor='callback_query')
 	print('Callback Query:', queryId, fromId, queryData)
 
+	
+startMessage = "To create a new IOU, enter '/newIOU'"
 
 bot = telepot.Bot('438370426:AAG3pe5fwtKN42TqnTel3WZ-QU4LqDP0Wos')
 
