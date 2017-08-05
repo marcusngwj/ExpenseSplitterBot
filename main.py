@@ -3,6 +3,7 @@ import time
 import threading
 import telepot
 from telepot.loop import MessageLoop
+from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
 
 def on_chat_message(msg):
 	contentType, chatType, chatId = telepot.glance(msg)
@@ -15,6 +16,13 @@ def on_chat_message(msg):
 			
 		if textFromUser == '/start':
 			bot.sendMessage(chatId, startMessage)
+		
+		elif textFromUser == '/newIOU':
+			keyboard = InlineKeyboardMarkup(inline_keyboard=[
+							[InlineKeyboardButton(text='Share IOU', callback_data='share')],
+							[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
+						])
+			bot.sendMessage(chatId, 'Testing', reply_markup=keyboard)
 			
 
 def on_callback_query(msg):
