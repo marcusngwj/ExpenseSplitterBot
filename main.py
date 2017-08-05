@@ -4,8 +4,6 @@ import threading
 import telepot
 from telepot.loop import MessageLoop
 
-bot = telepot.Bot('438370426:AAG3pe5fwtKN42TqnTel3WZ-QU4LqDP0Wos')
-
 def on_chat_message(msg):
 	contentType, chatType, chatId = telepot.glance(msg)
 	
@@ -23,6 +21,8 @@ def on_callback_query(msg):
 	queryId, fromId, queryData = telepot.glance(msg, flavor='callback_query')
 	print('Callback Query:', queryId, fromId, queryData)
 
+
+bot = telepot.Bot('438370426:AAG3pe5fwtKN42TqnTel3WZ-QU4LqDP0Wos')
 
 MessageLoop(bot, {'chat': on_chat_message,
 				  'callback_query': on_callback_query}).run_as_thread()
