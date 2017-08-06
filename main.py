@@ -35,13 +35,15 @@ def on_chat_message(msg):
 def on_callback_query(msg):
 	queryId, fromId, queryData = telepot.glance(msg, flavor='callback_query')
 	iouMsgIdf = telepot.message_identifier(msg['message'])
+
+	fromFirstName = msg['from']['first_name']
 	
 	if queryData == 'addExpense':
 		keyboard = InlineKeyboardMarkup(inline_keyboard=[
 						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 					])
-		testMsg = bot.editMessageText(iouMsgIdf, 'hello world', reply_markup=keyboard)
+		testMsg = bot.editMessageText(iouMsgIdf, fromFirstName, reply_markup=keyboard)
 			
 
 	
