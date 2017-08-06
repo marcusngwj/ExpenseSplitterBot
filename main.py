@@ -5,8 +5,12 @@ import telepot
 from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
 
+iouMap = {}
+
 def on_chat_message(msg):
 	contentType, chatType, chatId = telepot.glance(msg)
+	userId = msg['from']['id']
+	print('User Id: ', userId)
 	
 	if contentType != 'text':
 		return
@@ -22,12 +26,23 @@ def on_chat_message(msg):
 							[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 							[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 						])
-			bot.sendMessage(chatId, 'Testing', reply_markup=keyboard)
+			iouMsg = bot.sendMessage(chatId, 'Testing', reply_markup=keyboard)
+			iouMsgId = iouMsg['message_id']
+
+			#iouMap.update({userId:iouMsgId})
 			
 
 def on_callback_query(msg):
 	queryId, fromId, queryData = telepot.glance(msg, flavor='callback_query')
-	print('Callback Query:', queryId, fromId, queryData)
+	iouMsgIdf = telepot.message_identifier(msg['message'])
+	
+	if queryData == 'addExpense':
+		keyboard = InlineKeyboardMarkup(inline_keyboard=[
+						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
+						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
+					])
+		testMsg = bot.editMessageText(iouMsgIdf, 'hello world', reply_markup=keyboard)
+			
 
 	
 startMessage = "To create a new IOU, enter '/newIOU'"
