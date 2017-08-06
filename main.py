@@ -22,13 +22,10 @@ def on_chat_message(msg):
 		if textFromUser == '/start':
 			bot.sendMessage(chatId, startMessage)
 		
-		elif textFromUser == '/newIOU':
-			keyboard = InlineKeyboardMarkup(inline_keyboard=[
-							[InlineKeyboardButton(text='Share IOU', callback_data='share')],
-							[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
-						])
-			iouMsg = bot.sendMessage(chatId, 'Testing', reply_markup=keyboard)
-			iouMsgId = iouMsg['message_id']
+		elif textFromUser == '/newIOU':	
+			iou = Iou(userId, chatId)
+			iou.createNewIou()
+			
 
 			#iouMap.update({userId:iouMsgId})
 			
@@ -53,6 +50,19 @@ def getPublicKeyboard():
 	return keyboard
 			
 
+class Iou:
+	def __init__(self, userId, chatId):
+		self.userId = userId
+		self.chatId = chatId
+		
+	def createNewIou(self):
+		keyboard = InlineKeyboardMarkup(inline_keyboard=[
+						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
+						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
+					])
+		self.iouMsg = bot.sendMessage(self.chatId, 'A new IOU has been created', reply_markup=keyboard)
+		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
+	
 	
 startMessage = "To create a new IOU, enter '/newIOU'"
 
