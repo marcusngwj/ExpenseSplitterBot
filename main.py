@@ -7,9 +7,9 @@ from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
 from telepot.namedtuple import ForceReply
 
-iouUsageMap = {}	#Map user to currently using iou
-iouMap = {}			#Map iou to respective message_identifier
-userMap = {}		#Map user to userid
+iouUsageMap = {}	#Map user to currently using iou (userId:msgIdf)
+iouMap = {}			#Map iou to respective message_identifier (msgIdf:iou)
+userMap = {}		#Map user to userid (userId:person)
 
 def on_chat_message(msg):
 	contentType, chatType, chatId = telepot.glance(msg)
@@ -32,16 +32,21 @@ def on_chat_message(msg):
 			iou.createNewIou()
 			iouMap.update({iou.iouMsgIdf:iou})
 			
-			owner = Person(userId, msg['from']['first_name'], msg['from']['last_name'])
+			owner = Person(userId, msg['from']['first_name'])
+			owner.addNewIou(iou.iouMsgIdf, iou)
 			userMap.update({userId:owner})
 						
 			
 		if userId in iouUsageMap:
 			iouMsgIdf = iouUsageMap[userId]
 			iou = iouMap[iouMsgIdf]
-			iou.displayText = userId
-			iou.updateDisplay()
-			iouUsageMap.pop(userId)
+			
+			if not isFloat(textFromUser):
+				bot.sendMessage(userId, 'Please enter a valid amount')
+			else:
+				iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
+				iou.updateDisplay()
+				iouUsageMap.pop(userId)
   
 
 def on_callback_query(msg):
@@ -57,6 +62,11 @@ def on_callback_query(msg):
 	#Switch to PM, reply bot with amount spent
 	if queryData == 'addExpense':
 		iouUsageMap.update({fromId:iouMsgIdf})
+		iou = iouMap[iouMsgIdf]
+		
+		if fromId not in iou.spenderList:
+			person = Person(fromId, msg['from']['first_name'])
+			iouMap[iouMsgIdf].addSpender(person)
 		
 		bot.sendMessage(fromId, 'Send me the amount you spent')	#Need to explore switch inline pm
 		
@@ -69,7 +79,12 @@ def getPublicKeyboard():
 	return keyboard
 			
 			
-			
+def isFloat(string):
+	try:
+		float(string)
+		return True
+	except ValueError:
+		return False
 			
 			
 class Iou:
@@ -77,13 +92,14 @@ class Iou:
 		self.ownerId = ownerId
 		self.chatId = chatId
 		
-		self.spenderList = {}
+		self.spenderList = {}	#(userId:person)
 		
 		self.displayText = ''
 		
 	def createNewIou(self):
 		self.displayText = ("A new IOU has been created\n"
-							"Click 'Add Expense' to add an amout you spent")
+							"Click 'Add Expense' to add an amout you spent\n"
+							"Kindly speak to @ExpenseSplitterBot to activate this service")
 		self.keyboard = InlineKeyboardMarkup(inline_keyboard=[
 						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
@@ -92,17 +108,30 @@ class Iou:
 		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
 		
 	def addSpender(self, person):
-		spenderList.update({person.userId:person})
+		self.spenderList.update({person.userId:person})
+		
+	def getSpender(self, userId):
+		return self.spenderList[userId]
+		
+	def getDisplaySpender(self):
+		display = ''
+		for userId, person in self.spenderList.items():
+			name = person.first_name
+			amtSpent = person.amtSpent
+			display += name + ' spent $' + str(amtSpent) + '\n'
+		display += ("\n\n\nClick 'Add Expense' to add an amout you spent\n"
+					"Kindly speak to @ExpenseSplitterBot to activate this service")
+		return display
 		
 	def updateDisplay(self):
+		self.displayText = self.getDisplaySpender()
 		bot.editMessageText(self.iouMsgIdf, self.displayText, reply_markup=self.keyboard)
 	
 	
 class Person:
-	def __init__(self, userId, first_name, last_name):
+	def __init__(self, userId, first_name):
 		self.userId = userId
 		self.first_name = first_name
-		self.last_name = last_name
 		
 		self.amtSpent = 0
 		self.amtPaid = 0
@@ -110,12 +139,12 @@ class Person:
 		self.amtToReceive = 0
 		
 		self.iouListOwned = {}
-		
-		self.isAddingExpense = False
 	
-	def addNewIou(iouMsgIdf, iou):
+	def addNewIou(self, iouMsgIdf, iou):
 		self.iouListOwned.update({iouMsgIdf:iou})
-	
+		
+	def increaseAmtSpent(self, amount):
+		self.amtSpent += amount
 	
 startMessage = "To create a new IOU, enter '/newIOU'"
 
