@@ -11,8 +11,6 @@ iouUsageMap = {}	#Map user to currently using iou (userId:msgIdf)
 iouMap = {}			#Map iou to respective message_identifier (msgIdf:iou)
 userMap = {}		#Map user to userid (userId:person)
 
-bot = telepot.Bot('438370426:AAG3pe5fwtKN42TqnTel3WZ-QU4LqDP0Wos')
-
 def on_chat_message(msg):
 	contentType, chatType, chatId = telepot.glance(msg)
 	userId = msg['from']['id']
@@ -149,6 +147,8 @@ class Person:
 		self.amtSpent += amount
 	
 startMessage = "To create a new IOU, enter '/newIOU'"
+
+bot = telepot.Bot('438370426:AAG3pe5fwtKN42TqnTel3WZ-QU4LqDP0Wos')
 
 MessageLoop(bot, {'chat': on_chat_message,
 				  'callback_query': on_callback_query}).run_as_thread()
