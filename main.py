@@ -7,9 +7,12 @@ from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
 from telepot.namedtuple import ForceReply
 
-iouUsageMap = {}	#Map user to currently using iou (userId:msgIdf)
+iouUsageMap = {}	#Map user to currently using iou (userId:(iouMsgIdf, serviceType))
 iouMap = {}			#Map iou to respective message_identifier (msgIdf:iou)
 userMap = {}		#Map user to userid (userId:person)
+
+IOU_MSG_IDF = 0
+SERVICE_TYPE = 1
 
 def on_chat_message(msg):
 	contentType, chatType, chatId = telepot.glance(msg)
@@ -38,16 +41,26 @@ def on_chat_message(msg):
 						
 			
 		if userId in iouUsageMap:
-			iouMsgIdf = iouUsageMap[userId]
+			idfAndService = iouUsageMap[userId]
+			iouMsgIdf = idfAndService[IOU_MSG_IDF]
 			iou = iouMap[iouMsgIdf]
 			
-			if not isFloat(textFromUser):
-				bot.sendMessage(userId, 'Please enter a valid amount')
-			else:
-				iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
-				iou.updateDisplay()
-				iouUsageMap.pop(userId)
-  
+			if idfAndService[SERVICE_TYPE] == 'addExpense':
+				if not isNonNegativeFloat(textFromUser):
+					bot.sendMessage(userId, 'Please enter a valid amount')
+				else:
+					iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
+					iou.updateDisplay()
+					iouUsageMap.pop(userId)
+			
+			if idfAndService[SERVICE_TYPE] == 'editExpense':
+				if not isNonNegativeFloat(textFromUser):
+					bot.sendMessage(userId, 'Please enter a valid amount')
+				else:
+					iou.getSpender(userId).editAmtSpent(float(textFromUser))
+					iou.updateDisplay()
+					iouUsageMap.pop(userId)
+			
 
 def on_callback_query(msg):
 	queryId, fromId, queryData = telepot.glance(msg, flavor='callback_query')
@@ -61,15 +74,28 @@ def on_callback_query(msg):
 	
 	#Switch to PM, reply bot with amount spent
 	if queryData == 'addExpense':
-		iouUsageMap.update({fromId:iouMsgIdf})
+		serviceType = queryData
+		idfAndService = [iouMsgIdf, serviceType]
+		iouUsageMap.update({fromId:idfAndService})
 		iou = iouMap[iouMsgIdf]
 		
 		if fromId not in iou.spenderList:
 			person = Person(fromId, msg['from']['first_name'])
 			iouMap[iouMsgIdf].addSpender(person)
 		
-		bot.sendMessage(fromId, 'Send me the amount you spent')	#Need to explore switch inline pm
+		bot.sendMessage(fromId, 'Send me the amount you spent.')	#Need to explore switch inline pm
 		
+	if queryData == 'editExpense':
+		serviceType = queryData
+		idfAndService = [iouMsgIdf, serviceType]
+		iouUsageMap.update({fromId:idfAndService})
+		iou = iouMap[iouMsgIdf]
+		
+		if fromId not in iou.spenderList:
+			person = Person(fromId, msg['from']['first_name'])
+			iouMap[iouMsgIdf].addSpender(person)
+		
+		bot.sendMessage(fromId, 'Old record will be deleted.\nSend me the new amount.')	#Need to explore switch inline pm
 
 def getPublicKeyboard():
 	keyboard = InlineKeyboardMarkup(inline_keyboard=[
@@ -85,6 +111,9 @@ def isFloat(string):
 		return True
 	except ValueError:
 		return False
+		
+def isNonNegativeFloat(string):
+	return isFloat(string) and not float(string)<0
 			
 			
 class Iou:
@@ -98,11 +127,12 @@ class Iou:
 		
 	def createNewIou(self):
 		self.displayText = ("A new IOU has been created\n"
-							"Click 'Add Expense' to add an amout you spent\n"
-							"Kindly speak to @ExpenseSplitterBot to activate this service")
+							"Click 'Add Expense' to add an amout you spent.\n"
+							"Kindly speak to @ExpenseSplitterBot to activate this service.")
 		self.keyboard = InlineKeyboardMarkup(inline_keyboard=[
 						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
+						[InlineKeyboardButton(text='Edit expense', callback_data='editExpense')],
 					])
 		self.iouMsg = bot.sendMessage(self.chatId, self.displayText, reply_markup=self.keyboard)
 		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
@@ -145,6 +175,9 @@ class Person:
 		
 	def increaseAmtSpent(self, amount):
 		self.amtSpent += amount
+		
+	def editAmtSpent(self, amount):
+		self.amtSpent = amount
 	
 startMessage = "To create a new IOU, enter '/newIOU'"
 
