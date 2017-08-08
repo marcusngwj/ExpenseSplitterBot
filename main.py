@@ -5,9 +5,7 @@ import math
 import telepot
 from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
-<<<<<<< HEAD
 from telepot.namedtuple import InputTextMessageContent
-=======
 from telepot.namedtuple import ForceReply
 
 iouUsageMap = {}	#Map user to currently using iou (userId:msgIdf)
