@@ -123,18 +123,18 @@ class Iou:
 		
 		self.spenderList = {}	#(userId:person)
 		
-		self.displayText = ''
+		self.instructionalText = ("\n\n\nClick 'Add Expense' to add an amout you spent\n"
+								  "Kindly speak to @ExpenseSplitterBot to activate this service")
 		
 	def createNewIou(self):
-		self.displayText = ("A new IOU has been created\n"
-							"Click 'Add Expense' to add an amout you spent.\n"
-							"Kindly speak to @ExpenseSplitterBot to activate this service.")
+		displayText = "A new IOU has been created\n" + self.instructionalText
+		
 		self.keyboard = InlineKeyboardMarkup(inline_keyboard=[
 						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 						[InlineKeyboardButton(text='Edit expense', callback_data='editExpense')],
 					])
-		self.iouMsg = bot.sendMessage(self.chatId, self.displayText, reply_markup=self.keyboard)
+		self.iouMsg = bot.sendMessage(self.chatId, displayText, reply_markup=self.keyboard)
 		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
 		
 	def addSpender(self, person):
@@ -143,24 +143,25 @@ class Iou:
 	def getSpender(self, userId):
 		return self.spenderList[userId]
 		
+	def getTotalExpenses(self):
+		total = 0
+		for userId, person in self.spenderList.items():
+			total += person.amtSpent
+		return total	
+		
+	def getDisplayTotalExpenses(self):
+		return 'Total amount spent: $' + str(self.getTotalExpenses())
+		
 	def getDisplaySpender(self):
 		display = ''
 		for userId, person in self.spenderList.items():
 			name = person.first_name
 			amtSpent = person.amtSpent
 			display += name + ' spent $' + str(amtSpent) + '\n'
-		display += ("\n\n\nClick 'Add Expense' to add an amout you spent\n"
-					"Kindly speak to @ExpenseSplitterBot to activate this service")
 		return display
 		
-	def getTotalExpense(self):
-		total = 0
-		for userId, person in self.spenderList.items():
-			total += person.amtSpent
-		return total
-		
 	def updateDisplay(self):
-		self.displayText = self.getDisplaySpender()
+		self.displayText = self.getDisplayTotalExpenses() + self.instructionalText
 		bot.editMessageText(self.iouMsgIdf, self.displayText, reply_markup=self.keyboard)
 	
 	
