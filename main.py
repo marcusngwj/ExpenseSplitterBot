@@ -153,6 +153,12 @@ class Iou:
 					"Kindly speak to @ExpenseSplitterBot to activate this service")
 		return display
 		
+	def getTotalExpense(self):
+		total = 0
+		for userId, person in self.spenderList.items():
+			total += person.amtSpent
+		return total
+		
 	def updateDisplay(self):
 		self.displayText = self.getDisplaySpender()
 		bot.editMessageText(self.iouMsgIdf, self.displayText, reply_markup=self.keyboard)
