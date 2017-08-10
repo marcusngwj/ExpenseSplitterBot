@@ -215,12 +215,17 @@ class Iou:
 	def __computeReceivePay(self):
 		expectedAmtToPay = self.computeExpectedAmtToPay()
 		for userId, person in self.spenderList.items():
+			self.__resetAmtToReceivePay(person)
 			shortfallAmt = expectedAmtToPay - person.getAmtSpent()
 			print(person.first_name, str(shortfallAmt))
 			if shortfallAmt > 0:
 				person.setAmtToPay(shortfallAmt)
 			else:
 				person.setAmtToReceive((-1)*shortfallAmt)
+				
+	def __resetAmtToReceivePay(self, person):
+		person.setAmtToReceive(0)
+		person.setAmtToPay(0)
 		
 	def getSpender(self, userId):
 		return self.spenderList[userId]
