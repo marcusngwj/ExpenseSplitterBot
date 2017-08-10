@@ -140,17 +140,35 @@ class Iou:
 	def addSpender(self, person):
 		self.spenderList.update({person.userId:person})
 		
-	def getSpender(self, userId):
-		return self.spenderList[userId]
-		
-	def getTotalExpenses(self):
+	def computeTotalExpenses(self):
 		total = 0
 		for userId, person in self.spenderList.items():
 			total += person.amtSpent
-		return total	
+		return total
+	
+	#Compute amount a person supposed to pay
+	def computeExpectedAmtToPay(self):
+		totalAmtSpent = self.computeTotalExpenses()
+		numSpender = self.__getNumSpenders()
+		return totalAmtSpent/numSpender
+		
+	def __computeReceivePay(self):
+		expectedAmtToPay = self.computeExpectedAmtToPay()
+		for userId, person in self.spenderList.items():
+			shortfallAmt = expectedAmtToPay - person.amtSpent
+			if shortfallAmt > 0:
+				person.amtToPay = shortfallAmt
+			else:
+				person.amtToReceive = (-1)*shortfallAmt	
+		
+	def getSpender(self, userId):
+		return self.spenderList[userId]
+		
+	def __getNumSpenders(self):
+		return len(self.spenderList.keys())
 		
 	def getDisplayTotalExpenses(self):
-		return 'Total amount spent: $' + str(self.getTotalExpenses())
+		return 'Total amount spent: $' + str(self.computeTotalExpenses()) + '\n'
 		
 	def getDisplaySpender(self):
 		display = ''
@@ -160,10 +178,20 @@ class Iou:
 			display += name + ' spent $' + str(amtSpent) + '\n'
 		return display
 		
+	def getDisplayReceivePay(self):
+		self.__computeReceivePay()
+		display = ''
+		for userId, person in self.spenderList.items():
+			if person.amtToPay != 0:
+				display += person.first_name + ' needs to pay $' + str(person.amtToPay) + '\n'
+			elif person.amtToReceive != 0:
+				display += person.first_name + ' needs to receive $' + str(person.amtToReceive) + '\n'
+		return display
+		
 	def updateDisplay(self):
-		self.displayText = self.getDisplayTotalExpenses() + self.instructionalText
+		self.displayText = self.getDisplayTotalExpenses() + self.getDisplayReceivePay() + self.instructionalText
 		bot.editMessageText(self.iouMsgIdf, self.displayText, reply_markup=self.keyboard)
-	
+	#prog cant run. need debug
 	
 class Person:
 	def __init__(self, userId, first_name):
