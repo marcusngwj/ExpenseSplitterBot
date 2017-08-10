@@ -142,7 +142,7 @@ def viewTransactions(person, iou):
 	if person.userId == iou.chatId:	#If user is already in private chat with bot
 		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
 	else:
-		transactionInitMsg = 'A list of transaction services have been sent to ' + person.first_name + ' via PM'
+		transactionInitMsg = 'A list of transaction services have been sent to ' + person.getFirstName() + ' via PM'
 		bot.sendMessage(iou.chatId, transactionInitMsg)
 		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
 		
@@ -217,7 +217,6 @@ class Iou:
 		for userId, person in self.spenderList.items():
 			self.__resetAmtToReceivePay(person)
 			shortfallAmt = expectedAmtToPay - person.getAmtSpent()
-			print(person.first_name, str(shortfallAmt))
 			if shortfallAmt > 0:
 				person.setAmtToPay(shortfallAmt)
 			else:
@@ -242,7 +241,7 @@ class Iou:
 			
 		display = ''
 		for userId, person in self.spenderList.items():
-			name = person.first_name
+			name = person.getFirstName()
 			amtSpent = person.getAmtSpent()
 			display += name + ' spent $' + formatMoney(amtSpent) + '\n'
 		
@@ -253,9 +252,9 @@ class Iou:
 		display = ''
 		for userId, person in self.spenderList.items():
 			if person.getAmtToPay() != 0:
-				display += person.first_name + ' needs to pay $' + formatMoney(person.getAmtToPay()) + '\n'
+				display += person.getFirstName() + ' needs to pay $' + formatMoney(person.getAmtToPay()) + '\n'
 			elif person.getAmtToReceive() != 0:
-				display += person.first_name + ' needs to receive $' + formatMoney(person.getAmtToReceive()) + '\n'
+				display += person.getFirstName() + ' needs to receive $' + formatMoney(person.getAmtToReceive()) + '\n'
 		return display
 		
 	def updateDisplay(self):
@@ -266,7 +265,7 @@ class Iou:
 class Person:
 	def __init__(self, userId, first_name):
 		self.userId = userId
-		self.first_name = first_name
+		self.__first_name = first_name
 		
 		self.__amtSpent = 0
 		self.__amtPaid = 0
@@ -289,6 +288,9 @@ class Person:
 		
 	def setAmtToReceive(self, amount):
 		self.__amtToReceive = amount
+		
+	def getFirstName(self):
+		return self.__first_name
 		
 	def getAmtSpent(self):
 		return self.__amtSpent
