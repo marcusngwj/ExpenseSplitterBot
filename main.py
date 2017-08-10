@@ -21,6 +21,12 @@ def on_chat_message(msg):
 	print('Chat ID: ', chatId)
 	print('MESSAGE: ', msg, '\n')
 	
+	if userId not in userMap:
+		person = Person(userId, msg['from']['first_name'])
+		userMap.update({userId:person})
+	else:
+		person = userMap[userId]
+		
 	if contentType != 'text':
 		return
 	
@@ -35,9 +41,8 @@ def on_chat_message(msg):
 			iou.createNewIou()
 			iouMap.update({iou.iouMsgIdf:iou})
 			
-			owner = Person(userId, msg['from']['first_name'])
+			owner = person
 			owner.addNewIou(iou.iouMsgIdf, iou)
-			userMap.update({userId:owner})
 						
 			
 		if userId in iouUsageMap:
@@ -71,6 +76,11 @@ def on_callback_query(msg):
 	print('Query ID: ', queryId)
 	print('MsgIdf: ', iouMsgIdf, '\n')
 	
+	if fromId not in userMap:
+		person = Person(fromId, msg['from']['first_name'])
+		userMap.update({fromId:person})
+	else:
+		person = userMap[fromId]
 	
 	#Switch to PM, reply bot with amount spent
 	if queryData == 'addExpense':
@@ -96,11 +106,46 @@ def on_callback_query(msg):
 			iouMap[iouMsgIdf].addSpender(person)
 		
 		bot.sendMessage(fromId, 'Old record will be deleted.\nSend me the new amount.')	#Need to explore switch inline pm
+		
+	if queryData == 'viewTransactions':
+		serviceType = queryData
+		idfAndService = [iouMsgIdf, serviceType]
+		iouUsageMap.update({fromId:idfAndService})
+		iou = iouMap[iouMsgIdf]
+		
+		viewTransactions(person, iou)
+	
+	if queryData == 'viewSpenders':	
+		idfAndService = iouUsageMap[fromId]
+		iouMsgIdf = idfAndService[IOU_MSG_IDF]
+		iou = iouMap[iouMsgIdf]
+		
+		viewSpenders(person, iou)
+		
+
+def viewTransactions(person, iou):
+	keyboard = InlineKeyboardMarkup(inline_keyboard=[
+					[InlineKeyboardButton(text='View list of spenders', callback_data='viewSpenders')],
+					[InlineKeyboardButton(text='View list of payers', callback_data='viewPayers')],
+				])
+				
+	if person.userId == iou.chatId:	#If user is already in private chat with bot
+		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
+	else:
+		transactionInitMsg = 'A list of transaction services have been sent to ' + person.first_name + ' via PM'
+		bot.sendMessage(iou.chatId, transactionInitMsg)
+		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
+		
+
+def viewSpenders(person, iou):
+	bot.sendMessage(person.userId, iou.getDisplaySpender())
+	
 
 def getPublicKeyboard():
 	keyboard = InlineKeyboardMarkup(inline_keyboard=[
 					[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 					[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
+					[InlineKeyboardButton(text='View transactions', callback_data='viewTransactions')],
 				])
 	return keyboard
 			
@@ -114,7 +159,10 @@ def isFloat(string):
 		
 def isNonNegativeFloat(string):
 	return isFloat(string) and not float(string)<0
-			
+		
+
+
+		
 			
 class Iou:
 	def __init__(self, ownerId, chatId):
@@ -133,6 +181,7 @@ class Iou:
 						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 						[InlineKeyboardButton(text='Edit expense', callback_data='editExpense')],
+						[InlineKeyboardButton(text='View transactions', callback_data='viewTransactions')],
 					])
 		self.iouMsg = bot.sendMessage(self.chatId, displayText, reply_markup=self.keyboard)
 		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
@@ -171,11 +220,15 @@ class Iou:
 		return 'Total amount spent: $' + str(self.computeTotalExpenses()) + '\n'
 		
 	def getDisplaySpender(self):
+		if not self.spenderList:
+			return 'There are no spenders at this moment'
+			
 		display = ''
 		for userId, person in self.spenderList.items():
 			name = person.first_name
 			amtSpent = person.amtSpent
 			display += name + ' spent $' + str(amtSpent) + '\n'
+		
 		return display
 		
 	def getDisplayReceivePay(self):
@@ -191,7 +244,7 @@ class Iou:
 	def updateDisplay(self):
 		self.displayText = self.getDisplayTotalExpenses() + self.getDisplayReceivePay() + self.instructionalText
 		bot.editMessageText(self.iouMsgIdf, self.displayText, reply_markup=self.keyboard)
-	#prog cant run. need debug
+		
 	
 class Person:
 	def __init__(self, userId, first_name):
@@ -213,6 +266,7 @@ class Person:
 		
 	def editAmtSpent(self, amount):
 		self.amtSpent = amount
+		
 	
 startMessage = "To create a new IOU, enter '/newIOU'"
 
