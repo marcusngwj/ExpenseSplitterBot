@@ -56,6 +56,8 @@ def on_chat_message(msg):
 				else:
 					iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
 					iou.updateDisplay()
+					totalAmtSpentFeedback = 'You have spent a total of $' + str(iou.getSpender(userId).getAmtSpent())
+					bot.sendMessage(userId, totalAmtSpentFeedback)
 					iouUsageMap.pop(userId)
 			
 			if idfAndService[SERVICE_TYPE] == 'editExpense':
@@ -192,7 +194,7 @@ class Iou:
 	def computeTotalExpenses(self):
 		total = 0
 		for userId, person in self.spenderList.items():
-			total += person.amtSpent
+			total += person.getAmtSpent()
 		return total
 	
 	#Compute amount a person supposed to pay
@@ -204,11 +206,11 @@ class Iou:
 	def __computeReceivePay(self):
 		expectedAmtToPay = self.computeExpectedAmtToPay()
 		for userId, person in self.spenderList.items():
-			shortfallAmt = expectedAmtToPay - person.amtSpent
+			shortfallAmt = expectedAmtToPay - person.getAmtSpent()
 			if shortfallAmt > 0:
-				person.amtToPay = shortfallAmt
+				person.setAmtToPay(shortfallAmt)
 			else:
-				person.amtToReceive = (-1)*shortfallAmt	
+				person.setAmtToReceive((-1)*shortfallAmt)
 		
 	def getSpender(self, userId):
 		return self.spenderList[userId]
@@ -226,7 +228,7 @@ class Iou:
 		display = ''
 		for userId, person in self.spenderList.items():
 			name = person.first_name
-			amtSpent = person.amtSpent
+			amtSpent = person.getAmtSpent()
 			display += name + ' spent $' + str(amtSpent) + '\n'
 		
 		return display
@@ -235,10 +237,10 @@ class Iou:
 		self.__computeReceivePay()
 		display = ''
 		for userId, person in self.spenderList.items():
-			if person.amtToPay != 0:
-				display += person.first_name + ' needs to pay $' + str(person.amtToPay) + '\n'
-			elif person.amtToReceive != 0:
-				display += person.first_name + ' needs to receive $' + str(person.amtToReceive) + '\n'
+			if person.getAmtToPay() != 0:
+				display += person.first_name + ' needs to pay $' + str(person.getAmtToPay()) + '\n'
+			elif person.getAmtToReceive() != 0:
+				display += person.first_name + ' needs to receive $' + str(person.getAmtToReceive()) + '\n'
 		return display
 		
 	def updateDisplay(self):
@@ -251,22 +253,40 @@ class Person:
 		self.userId = userId
 		self.first_name = first_name
 		
-		self.amtSpent = 0
-		self.amtPaid = 0
-		self.amtToPay = 0
-		self.amtToReceive = 0
+		self.__amtSpent = 0
+		self.__amtPaid = 0
+		self.__amtToPay = 0
+		self.__amtToReceive = 0
 		
-		self.iouListOwned = {}
+		self.__iouListOwned = {}
 	
 	def addNewIou(self, iouMsgIdf, iou):
-		self.iouListOwned.update({iouMsgIdf:iou})
+		self.__iouListOwned.update({iouMsgIdf:iou})
 		
 	def increaseAmtSpent(self, amount):
-		self.amtSpent += amount
+		self.__amtSpent += amount
 		
 	def editAmtSpent(self, amount):
-		self.amtSpent = amount
+		self.__amtSpent = amount
 		
+	def setAmtToPay(self, amount):
+		self.__amtToPay = amount
+		
+	def setAmtToReceive(self, amount):
+		self.__amtToReceive = amount
+		
+	def getAmtSpent(self):
+		return self.__amtSpent
+		
+	def getAmtPaid(self):
+		return self.__amtPaid
+		
+	def getAmtToPay(self):
+		return self.__amtToPay
+		
+	def getAmtToReceive(self):
+		return self.__amtToReceive
+
 	
 startMessage = "To create a new IOU, enter '/newIOU'"
 
