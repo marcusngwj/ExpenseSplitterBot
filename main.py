@@ -66,6 +66,8 @@ def on_chat_message(msg):
 				else:
 					iou.getSpender(userId).editAmtSpent(float(textFromUser))
 					iou.updateDisplay()
+					totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
+					bot.sendMessage(userId, totalAmtSpentFeedback)
 					iouUsageMap.pop(userId)
 			
 
@@ -92,7 +94,6 @@ def on_callback_query(msg):
 		iou = iouMap[iouMsgIdf]
 		
 		if fromId not in iou.spenderList:
-			person = Person(fromId, msg['from']['first_name'])
 			iouMap[iouMsgIdf].addSpender(person)
 		
 		bot.sendMessage(fromId, 'Send me the amount you spent.')	#Need to explore switch inline pm
@@ -104,10 +105,17 @@ def on_callback_query(msg):
 		iou = iouMap[iouMsgIdf]
 		
 		if fromId not in iou.spenderList:
-			person = Person(fromId, msg['from']['first_name'])
 			iouMap[iouMsgIdf].addSpender(person)
 		
-		bot.sendMessage(fromId, 'Old record will be deleted.\nSend me the new amount.')	#Need to explore switch inline pm
+		if person.getAmtSpent() == 0:
+			bot.sendMessage(fromId, 'You have not spend any money so far.\nSend me the amount you spent.')
+		else:
+			expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(person.getAmtSpent()) + '.\n'
+								'This amount will be deleted.\n'
+								'Send me the new amount.')
+			bot.sendMessage(fromId, expenseEditionMsg)
+			
+									
 		
 	if queryData == 'viewTransactions':
 		serviceType = queryData
@@ -208,6 +216,7 @@ class Iou:
 		expectedAmtToPay = self.computeExpectedAmtToPay()
 		for userId, person in self.spenderList.items():
 			shortfallAmt = expectedAmtToPay - person.getAmtSpent()
+			print(person.first_name, str(shortfallAmt))
 			if shortfallAmt > 0:
 				person.setAmtToPay(shortfallAmt)
 			else:
