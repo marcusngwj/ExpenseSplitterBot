@@ -139,16 +139,16 @@ def viewTransactions(person, iou):
 					[InlineKeyboardButton(text='View list of payers', callback_data='viewPayers')],
 				])
 				
-	if person.userId == iou.chatId:	#If user is already in private chat with bot
-		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
+	if person.getUserId() == iou.chatId:	#If user is already in private chat with bot
+		bot.sendMessage(person.getUserId(), 'Kindly choose from the following services', reply_markup=keyboard)	
 	else:
 		transactionInitMsg = 'A list of transaction services have been sent to ' + person.getFirstName() + ' via PM'
 		bot.sendMessage(iou.chatId, transactionInitMsg)
-		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
+		bot.sendMessage(person.getUserId(), 'Kindly choose from the following services', reply_markup=keyboard)	
 		
 
 def viewSpenders(person, iou):
-	bot.sendMessage(person.userId, iou.getDisplaySpender())
+	bot.sendMessage(person.getUserId(), iou.getDisplaySpender())
 	
 
 def getPublicKeyboard():
@@ -198,7 +198,7 @@ class Iou:
 		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
 		
 	def addSpender(self, person):
-		self.spenderList.update({person.userId:person})
+		self.spenderList.update({person.getUserId():person})
 		
 	def computeTotalExpenses(self):
 		total = 0
@@ -264,8 +264,8 @@ class Iou:
 	
 class Person:
 	def __init__(self, userId, first_name):
-		self.userId = userId
-		self.__first_name = first_name
+		self.__userId = userId
+		self.__firstName = first_name
 		
 		self.__amtSpent = 0
 		self.__amtPaid = 0
@@ -289,8 +289,11 @@ class Person:
 	def setAmtToReceive(self, amount):
 		self.__amtToReceive = amount
 		
+	def getUserId(self):
+		return self.__userId
+		
 	def getFirstName(self):
-		return self.__first_name
+		return self.__firstName
 		
 	def getAmtSpent(self):
 		return self.__amtSpent
