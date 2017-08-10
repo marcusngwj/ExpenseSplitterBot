@@ -39,10 +39,10 @@ def on_chat_message(msg):
 		elif textFromUser == '/newIOU':	
 			iou = Iou(userId, chatId)
 			iou.createNewIou()
-			iouMap.update({iou.iouMsgIdf:iou})
+			iouMap.update({iou.getIouMsgIdf():iou})
 			
 			owner = person
-			owner.addNewIou(iou.iouMsgIdf, iou)
+			owner.addNewIou(iou.getIouMsgIdf(), iou)
 						
 			
 		if userId in iouUsageMap:
@@ -56,6 +56,8 @@ def on_chat_message(msg):
 				else:
 					iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
 					iou.updateDisplay()
+					totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
+					bot.sendMessage(userId, totalAmtSpentFeedback)
 					iouUsageMap.pop(userId)
 			
 			if idfAndService[SERVICE_TYPE] == 'editExpense':
@@ -64,6 +66,8 @@ def on_chat_message(msg):
 				else:
 					iou.getSpender(userId).editAmtSpent(float(textFromUser))
 					iou.updateDisplay()
+					totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
+					bot.sendMessage(userId, totalAmtSpentFeedback)
 					iouUsageMap.pop(userId)
 			
 
@@ -89,8 +93,7 @@ def on_callback_query(msg):
 		iouUsageMap.update({fromId:idfAndService})
 		iou = iouMap[iouMsgIdf]
 		
-		if fromId not in iou.spenderList:
-			person = Person(fromId, msg['from']['first_name'])
+		if fromId not in iou.getSpenderList():
 			iouMap[iouMsgIdf].addSpender(person)
 		
 		bot.sendMessage(fromId, 'Send me the amount you spent.')	#Need to explore switch inline pm
@@ -101,11 +104,18 @@ def on_callback_query(msg):
 		iouUsageMap.update({fromId:idfAndService})
 		iou = iouMap[iouMsgIdf]
 		
-		if fromId not in iou.spenderList:
-			person = Person(fromId, msg['from']['first_name'])
+		if fromId not in iou.getSpenderList():
 			iouMap[iouMsgIdf].addSpender(person)
 		
-		bot.sendMessage(fromId, 'Old record will be deleted.\nSend me the new amount.')	#Need to explore switch inline pm
+		if person.getAmtSpent() == 0:
+			bot.sendMessage(fromId, 'You have not spend any money so far.\nSend me the amount you spent.')
+		else:
+			expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(person.getAmtSpent()) + '.\n'
+								'This amount will be deleted.\n'
+								'Send me the new amount.')
+			bot.sendMessage(fromId, expenseEditionMsg)
+			
+									
 		
 	if queryData == 'viewTransactions':
 		serviceType = queryData
@@ -129,16 +139,16 @@ def viewTransactions(person, iou):
 					[InlineKeyboardButton(text='View list of payers', callback_data='viewPayers')],
 				])
 				
-	if person.userId == iou.chatId:	#If user is already in private chat with bot
-		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
+	if person.getUserId() == iou.getChatId():	#If user is already in private chat with bot
+		bot.sendMessage(person.getUserId(), 'Kindly choose from the following services', reply_markup=keyboard)	
 	else:
-		transactionInitMsg = 'A list of transaction services have been sent to ' + person.first_name + ' via PM'
-		bot.sendMessage(iou.chatId, transactionInitMsg)
-		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
+		transactionInitMsg = 'A list of transaction services have been sent to ' + person.getFirstName() + ' via PM'
+		bot.sendMessage(iou.getChatId(), transactionInitMsg)
+		bot.sendMessage(person.getUserId(), 'Kindly choose from the following services', reply_markup=keyboard)	
 		
 
 def viewSpenders(person, iou):
-	bot.sendMessage(person.userId, iou.getDisplaySpender())
+	bot.sendMessage(person.getUserId(), iou.getDisplaySpender())
 	
 
 def getPublicKeyboard():
@@ -160,113 +170,155 @@ def isFloat(string):
 def isNonNegativeFloat(string):
 	return isFloat(string) and not float(string)<0
 		
-
+def formatMoney(amount):
+	return '%.2f' % amount
 
 		
 			
 class Iou:
 	def __init__(self, ownerId, chatId):
-		self.ownerId = ownerId
-		self.chatId = chatId
+		self.__ownerId = ownerId
+		self.__chatId = chatId
 		
-		self.spenderList = {}	#(userId:person)
+		self.__spenderList = {}	#(userId:person)
 		
-		self.instructionalText = ("\n\n\nClick 'Add Expense' to add an amout you spent\n"
+		self.__instructionalText = ("\n\n\nClick 'Add Expense' to add an amout you spent\n"
 								  "Kindly speak to @ExpenseSplitterBot to activate this service")
 		
 	def createNewIou(self):
-		displayText = "A new IOU has been created\n" + self.instructionalText
+		displayText = "A new IOU has been created\n" + self.__instructionalText
 		
-		self.keyboard = InlineKeyboardMarkup(inline_keyboard=[
+		self.__keyboard = InlineKeyboardMarkup(inline_keyboard=[
 						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 						[InlineKeyboardButton(text='Edit expense', callback_data='editExpense')],
 						[InlineKeyboardButton(text='View transactions', callback_data='viewTransactions')],
 					])
-		self.iouMsg = bot.sendMessage(self.chatId, displayText, reply_markup=self.keyboard)
-		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
+		self.__iouMsg = bot.sendMessage(self.__chatId, displayText, reply_markup=self.__keyboard)
+		self.__iouMsgIdf = telepot.message_identifier(self.__iouMsg)
 		
 	def addSpender(self, person):
-		self.spenderList.update({person.userId:person})
+		self.__spenderList.update({person.getUserId():person})
 		
-	def computeTotalExpenses(self):
+	def __computeTotalExpenses(self):
 		total = 0
-		for userId, person in self.spenderList.items():
-			total += person.amtSpent
+		for userId, person in self.__spenderList.items():
+			total += person.getAmtSpent()
 		return total
 	
 	#Compute amount a person supposed to pay
-	def computeExpectedAmtToPay(self):
-		totalAmtSpent = self.computeTotalExpenses()
+	def __computeExpectedAmtToPay(self):
+		totalAmtSpent = self.__computeTotalExpenses()
 		numSpender = self.__getNumSpenders()
 		return totalAmtSpent/numSpender
 		
 	def __computeReceivePay(self):
-		expectedAmtToPay = self.computeExpectedAmtToPay()
-		for userId, person in self.spenderList.items():
-			shortfallAmt = expectedAmtToPay - person.amtSpent
+		expectedAmtToPay = self.__computeExpectedAmtToPay()
+		for userId, person in self.__spenderList.items():
+			self.__resetAmtToReceivePay(person)
+			shortfallAmt = expectedAmtToPay - person.getAmtSpent()
 			if shortfallAmt > 0:
-				person.amtToPay = shortfallAmt
+				person.setAmtToPay(shortfallAmt)
 			else:
-				person.amtToReceive = (-1)*shortfallAmt	
+				person.setAmtToReceive((-1)*shortfallAmt)
+				
+	def __resetAmtToReceivePay(self, person):
+		person.setAmtToReceive(0)
+		person.setAmtToPay(0)
+		
+	def getChatId(self):
+		return self.__chatId
+		
+	def getIouMsg(self):
+		return self.__iouMsg
+		
+	def getIouMsgIdf(self):
+		return self.__iouMsgIdf
+		
+	def getSpenderList(self):
+		return self.__spenderList
 		
 	def getSpender(self, userId):
-		return self.spenderList[userId]
+		return self.__spenderList[userId]
 		
 	def __getNumSpenders(self):
-		return len(self.spenderList.keys())
+		return len(self.__spenderList.keys())
 		
-	def getDisplayTotalExpenses(self):
-		return 'Total amount spent: $' + str(self.computeTotalExpenses()) + '\n'
+	def __getDisplayTotalExpenses(self):
+		return 'Total amount spent: $' + formatMoney(self.__computeTotalExpenses()) + '\n'
 		
 	def getDisplaySpender(self):
-		if not self.spenderList:
+		if not self.__spenderList:
 			return 'There are no spenders at this moment'
 			
 		display = ''
-		for userId, person in self.spenderList.items():
-			name = person.first_name
-			amtSpent = person.amtSpent
-			display += name + ' spent $' + str(amtSpent) + '\n'
+		for userId, person in self.__spenderList.items():
+			name = person.getFirstName()
+			amtSpent = person.getAmtSpent()
+			display += name + ' spent $' + formatMoney(amtSpent) + '\n'
 		
 		return display
 		
-	def getDisplayReceivePay(self):
+	def __getDisplayReceivePay(self):
 		self.__computeReceivePay()
 		display = ''
-		for userId, person in self.spenderList.items():
-			if person.amtToPay != 0:
-				display += person.first_name + ' needs to pay $' + str(person.amtToPay) + '\n'
-			elif person.amtToReceive != 0:
-				display += person.first_name + ' needs to receive $' + str(person.amtToReceive) + '\n'
+		for userId, person in self.__spenderList.items():
+			if person.getAmtToPay() != 0:
+				display += person.getFirstName() + ' needs to pay $' + formatMoney(person.getAmtToPay()) + '\n'
+			elif person.getAmtToReceive() != 0:
+				display += person.getFirstName() + ' needs to receive $' + formatMoney(person.getAmtToReceive()) + '\n'
 		return display
 		
 	def updateDisplay(self):
-		self.displayText = self.getDisplayTotalExpenses() + self.getDisplayReceivePay() + self.instructionalText
-		bot.editMessageText(self.iouMsgIdf, self.displayText, reply_markup=self.keyboard)
+		self.displayText = self.__getDisplayTotalExpenses() + self.__getDisplayReceivePay() + self.__instructionalText
+		bot.editMessageText(self.__iouMsgIdf, self.displayText, reply_markup=self.__keyboard)
 		
 	
 class Person:
 	def __init__(self, userId, first_name):
-		self.userId = userId
-		self.first_name = first_name
+		self.__userId = userId
+		self.__firstName = first_name
 		
-		self.amtSpent = 0
-		self.amtPaid = 0
-		self.amtToPay = 0
-		self.amtToReceive = 0
+		self.__amtSpent = 0
+		self.__amtPaid = 0
+		self.__amtToPay = 0
+		self.__amtToReceive = 0
 		
-		self.iouListOwned = {}
+		self.__iouListOwned = {}
 	
 	def addNewIou(self, iouMsgIdf, iou):
-		self.iouListOwned.update({iouMsgIdf:iou})
+		self.__iouListOwned.update({iouMsgIdf:iou})
 		
 	def increaseAmtSpent(self, amount):
-		self.amtSpent += amount
+		self.__amtSpent += amount
 		
 	def editAmtSpent(self, amount):
-		self.amtSpent = amount
+		self.__amtSpent = amount
 		
+	def setAmtToPay(self, amount):
+		self.__amtToPay = amount
+		
+	def setAmtToReceive(self, amount):
+		self.__amtToReceive = amount
+		
+	def getUserId(self):
+		return self.__userId
+		
+	def getFirstName(self):
+		return self.__firstName
+		
+	def getAmtSpent(self):
+		return self.__amtSpent
+		
+	def getAmtPaid(self):
+		return self.__amtPaid
+		
+	def getAmtToPay(self):
+		return self.__amtToPay
+		
+	def getAmtToReceive(self):
+		return self.__amtToReceive
+
 	
 startMessage = "To create a new IOU, enter '/newIOU'"
 
