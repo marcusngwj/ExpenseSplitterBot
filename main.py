@@ -123,25 +123,52 @@ class Iou:
 		
 		self.spenderList = {}	#(userId:person)
 		
-		self.displayText = ''
+		self.instructionalText = ("\n\n\nClick 'Add Expense' to add an amout you spent\n"
+								  "Kindly speak to @ExpenseSplitterBot to activate this service")
 		
 	def createNewIou(self):
-		self.displayText = ("A new IOU has been created\n"
-							"Click 'Add Expense' to add an amout you spent.\n"
-							"Kindly speak to @ExpenseSplitterBot to activate this service.")
+		displayText = "A new IOU has been created\n" + self.instructionalText
+		
 		self.keyboard = InlineKeyboardMarkup(inline_keyboard=[
 						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 						[InlineKeyboardButton(text='Edit expense', callback_data='editExpense')],
 					])
-		self.iouMsg = bot.sendMessage(self.chatId, self.displayText, reply_markup=self.keyboard)
+		self.iouMsg = bot.sendMessage(self.chatId, displayText, reply_markup=self.keyboard)
 		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
 		
 	def addSpender(self, person):
 		self.spenderList.update({person.userId:person})
 		
+	def computeTotalExpenses(self):
+		total = 0
+		for userId, person in self.spenderList.items():
+			total += person.amtSpent
+		return total
+	
+	#Compute amount a person supposed to pay
+	def computeExpectedAmtToPay(self):
+		totalAmtSpent = self.computeTotalExpenses()
+		numSpender = self.__getNumSpenders()
+		return totalAmtSpent/numSpender
+		
+	def __computeReceivePay(self):
+		expectedAmtToPay = self.computeExpectedAmtToPay()
+		for userId, person in self.spenderList.items():
+			shortfallAmt = expectedAmtToPay - person.amtSpent
+			if shortfallAmt > 0:
+				person.amtToPay = shortfallAmt
+			else:
+				person.amtToReceive = (-1)*shortfallAmt	
+		
 	def getSpender(self, userId):
 		return self.spenderList[userId]
+		
+	def __getNumSpenders(self):
+		return len(self.spenderList.keys())
+		
+	def getDisplayTotalExpenses(self):
+		return 'Total amount spent: $' + str(self.computeTotalExpenses()) + '\n'
 		
 	def getDisplaySpender(self):
 		display = ''
@@ -149,14 +176,22 @@ class Iou:
 			name = person.first_name
 			amtSpent = person.amtSpent
 			display += name + ' spent $' + str(amtSpent) + '\n'
-		display += ("\n\n\nClick 'Add Expense' to add an amout you spent\n"
-					"Kindly speak to @ExpenseSplitterBot to activate this service")
+		return display
+		
+	def getDisplayReceivePay(self):
+		self.__computeReceivePay()
+		display = ''
+		for userId, person in self.spenderList.items():
+			if person.amtToPay != 0:
+				display += person.first_name + ' needs to pay $' + str(person.amtToPay) + '\n'
+			elif person.amtToReceive != 0:
+				display += person.first_name + ' needs to receive $' + str(person.amtToReceive) + '\n'
 		return display
 		
 	def updateDisplay(self):
-		self.displayText = self.getDisplaySpender()
+		self.displayText = self.getDisplayTotalExpenses() + self.getDisplayReceivePay() + self.instructionalText
 		bot.editMessageText(self.iouMsgIdf, self.displayText, reply_markup=self.keyboard)
-	
+	#prog cant run. need debug
 	
 class Person:
 	def __init__(self, userId, first_name):
