@@ -96,11 +96,40 @@ def on_callback_query(msg):
 			iouMap[iouMsgIdf].addSpender(person)
 		
 		bot.sendMessage(fromId, 'Old record will be deleted.\nSend me the new amount.')	#Need to explore switch inline pm
+		
+	if queryData == 'viewTransactions':
+		serviceType = queryData
+		idfAndService = [iouMsgIdf, serviceType]
+		iouUsageMap.update({fromId:idfAndService})
+		iou = iouMap[iouMsgIdf]
+		
+		if fromId not in iou.spenderList:
+			person = Person(fromId, msg['from']['first_name'])
+			iouMap[iouMsgIdf].addSpender(person)
+			
+		viewTransactions(person, iou)
+		
+
+def viewTransactions(person, iou):
+	keyboard = InlineKeyboardMarkup(inline_keyboard=[
+					[InlineKeyboardButton(text='View list of spenders', callback_data='ViewSpender')],
+					[InlineKeyboardButton(text='View list of payers', callback_data='addExpense')],
+				])
+				
+	if person.userId == iou.chatId:	#If user is already in private chat with bot
+		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
+	else:
+		transactionInitMsg = 'A list of transaction services have been sent to ' + person.first_name + ' via PM'
+		bot.sendMessage(iou.chatId, transactionInitMsg)
+		bot.sendMessage(person.userId, 'Kindly choose from the following services', reply_markup=keyboard)	
+	
+	
 
 def getPublicKeyboard():
 	keyboard = InlineKeyboardMarkup(inline_keyboard=[
 					[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 					[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
+					[InlineKeyboardButton(text='View transactions', callback_data='viewTransactions')],
 				])
 	return keyboard
 			
@@ -133,6 +162,7 @@ class Iou:
 						[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 						[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 						[InlineKeyboardButton(text='Edit expense', callback_data='editExpense')],
+						[InlineKeyboardButton(text='View transactions', callback_data='viewTransactions')],
 					])
 		self.iouMsg = bot.sendMessage(self.chatId, displayText, reply_markup=self.keyboard)
 		self.iouMsgIdf = telepot.message_identifier(self.iouMsg)
