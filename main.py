@@ -56,7 +56,7 @@ def on_chat_message(msg):
 				else:
 					iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
 					iou.updateDisplay()
-					totalAmtSpentFeedback = 'You have spent a total of $' + str(iou.getSpender(userId).getAmtSpent())
+					totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
 					bot.sendMessage(userId, totalAmtSpentFeedback)
 					iouUsageMap.pop(userId)
 			
@@ -162,7 +162,8 @@ def isFloat(string):
 def isNonNegativeFloat(string):
 	return isFloat(string) and not float(string)<0
 		
-
+def formatMoney(amount):
+	return '%.2f' % amount
 
 		
 			
@@ -219,7 +220,7 @@ class Iou:
 		return len(self.spenderList.keys())
 		
 	def getDisplayTotalExpenses(self):
-		return 'Total amount spent: $' + str(self.computeTotalExpenses()) + '\n'
+		return 'Total amount spent: $' + formatMoney(self.computeTotalExpenses()) + '\n'
 		
 	def getDisplaySpender(self):
 		if not self.spenderList:
@@ -229,7 +230,7 @@ class Iou:
 		for userId, person in self.spenderList.items():
 			name = person.first_name
 			amtSpent = person.getAmtSpent()
-			display += name + ' spent $' + str(amtSpent) + '\n'
+			display += name + ' spent $' + formatMoney(amtSpent) + '\n'
 		
 		return display
 		
@@ -238,9 +239,9 @@ class Iou:
 		display = ''
 		for userId, person in self.spenderList.items():
 			if person.getAmtToPay() != 0:
-				display += person.first_name + ' needs to pay $' + str(person.getAmtToPay()) + '\n'
+				display += person.first_name + ' needs to pay $' + formatMoney(person.getAmtToPay()) + '\n'
 			elif person.getAmtToReceive() != 0:
-				display += person.first_name + ' needs to receive $' + str(person.getAmtToReceive()) + '\n'
+				display += person.first_name + ' needs to receive $' + formatMoney(person.getAmtToReceive()) + '\n'
 		return display
 		
 	def updateDisplay(self):
