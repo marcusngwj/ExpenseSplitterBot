@@ -200,20 +200,20 @@ class Iou:
 	def addSpender(self, person):
 		self.spenderList.update({person.getUserId():person})
 		
-	def computeTotalExpenses(self):
+	def __computeTotalExpenses(self):
 		total = 0
 		for userId, person in self.spenderList.items():
 			total += person.getAmtSpent()
 		return total
 	
 	#Compute amount a person supposed to pay
-	def computeExpectedAmtToPay(self):
-		totalAmtSpent = self.computeTotalExpenses()
+	def __computeExpectedAmtToPay(self):
+		totalAmtSpent = self.__computeTotalExpenses()
 		numSpender = self.__getNumSpenders()
 		return totalAmtSpent/numSpender
 		
 	def __computeReceivePay(self):
-		expectedAmtToPay = self.computeExpectedAmtToPay()
+		expectedAmtToPay = self.__computeExpectedAmtToPay()
 		for userId, person in self.spenderList.items():
 			self.__resetAmtToReceivePay(person)
 			shortfallAmt = expectedAmtToPay - person.getAmtSpent()
@@ -232,8 +232,8 @@ class Iou:
 	def __getNumSpenders(self):
 		return len(self.spenderList.keys())
 		
-	def getDisplayTotalExpenses(self):
-		return 'Total amount spent: $' + formatMoney(self.computeTotalExpenses()) + '\n'
+	def __getDisplayTotalExpenses(self):
+		return 'Total amount spent: $' + formatMoney(self.__computeTotalExpenses()) + '\n'
 		
 	def getDisplaySpender(self):
 		if not self.spenderList:
@@ -247,7 +247,7 @@ class Iou:
 		
 		return display
 		
-	def getDisplayReceivePay(self):
+	def __getDisplayReceivePay(self):
 		self.__computeReceivePay()
 		display = ''
 		for userId, person in self.spenderList.items():
@@ -258,7 +258,7 @@ class Iou:
 		return display
 		
 	def updateDisplay(self):
-		self.displayText = self.getDisplayTotalExpenses() + self.getDisplayReceivePay() + self.instructionalText
+		self.displayText = self.__getDisplayTotalExpenses() + self.__getDisplayReceivePay() + self.instructionalText
 		bot.editMessageText(self.iouMsgIdf, self.displayText, reply_markup=self.keyboard)
 		
 	
