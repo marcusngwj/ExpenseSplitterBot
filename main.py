@@ -46,29 +46,7 @@ def on_chat_message(msg):
 						
 			
 		if userId in iouUsageMap:
-			idfAndService = iouUsageMap[userId]
-			iouMsgIdf = idfAndService[IOU_MSG_IDF]
-			iou = iouMap[iouMsgIdf]
-			
-			if idfAndService[SERVICE_TYPE] == 'addExpense':
-				if not isNonNegativeFloat(textFromUser):
-					bot.sendMessage(userId, 'Please enter a valid amount')
-				else:
-					iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
-					updateDisplay(iou)
-					totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
-					bot.sendMessage(userId, totalAmtSpentFeedback)
-					iouUsageMap.pop(userId)
-			
-			if idfAndService[SERVICE_TYPE] == 'editExpense':
-				if not isNonNegativeFloat(textFromUser):
-					bot.sendMessage(userId, 'Please enter a valid amount')
-				else:
-					iou.getSpender(userId).editAmtSpent(float(textFromUser))
-					updateDisplay(iou)
-					totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
-					bot.sendMessage(userId, totalAmtSpentFeedback)
-					iouUsageMap.pop(userId)
+			responseToCallback(userId, textFromUser)
 			
 
 def on_callback_query(msg):
@@ -132,7 +110,33 @@ def on_callback_query(msg):
 		
 		viewSpenders(person, iou)
 
-		
+	
+def responseToCallback(userId, textFromUser):
+	idfAndService = iouUsageMap[userId]
+	iouMsgIdf = idfAndService[IOU_MSG_IDF]
+	iou = iouMap[iouMsgIdf]
+	
+	if idfAndService[SERVICE_TYPE] == 'addExpense':
+		if not isNonNegativeFloat(textFromUser):
+			bot.sendMessage(userId, 'Please enter a valid amount')
+		else:
+			iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
+			updateDisplay(iou)
+			totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
+			bot.sendMessage(userId, totalAmtSpentFeedback)
+			iouUsageMap.pop(userId)
+	
+	if idfAndService[SERVICE_TYPE] == 'editExpense':
+		if not isNonNegativeFloat(textFromUser):
+			bot.sendMessage(userId, 'Please enter a valid amount')
+		else:
+			iou.getSpender(userId).editAmtSpent(float(textFromUser))
+			updateDisplay(iou)
+			totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
+			bot.sendMessage(userId, totalAmtSpentFeedback)
+			iouUsageMap.pop(userId)
+
+
 def createNewIouMsg(iou):
 		newIouDisplayText = "A new IOU has been created\n" + iou.getInstructionalText()
 		
