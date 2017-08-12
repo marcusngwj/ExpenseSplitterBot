@@ -46,6 +46,7 @@ def on_chat_message(msg):
 						
 			
 		if userId in iouUsageMap:
+			print('summer is here')
 			responseToCallback(userId, textFromUser)
 			
 
@@ -91,9 +92,7 @@ def on_callback_query(msg):
 			expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(person.getAmtSpent()) + '.\n'
 								'This amount will be deleted.\n'
 								'Send me the new amount.')
-			bot.sendMessage(fromId, expenseEditionMsg)
-			
-									
+			bot.sendMessage(fromId, expenseEditionMsg)								
 		
 	if queryData == 'viewTransactions':
 		serviceType = queryData
@@ -117,26 +116,32 @@ def responseToCallback(userId, textFromUser):
 	iou = iouMap[iouMsgIdf]
 	
 	if idfAndService[SERVICE_TYPE] == 'addExpense':
-		if not isNonNegativeFloat(textFromUser):
-			bot.sendMessage(userId, 'Please enter a valid amount')
-		else:
-			iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
-			updateDisplay(iou)
-			totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
-			bot.sendMessage(userId, totalAmtSpentFeedback)
-			iouUsageMap.pop(userId)
+		responseToCallback_AddExpense(iou, userId, textFromUser)
 	
 	if idfAndService[SERVICE_TYPE] == 'editExpense':
-		if not isNonNegativeFloat(textFromUser):
-			bot.sendMessage(userId, 'Please enter a valid amount')
-		else:
-			iou.getSpender(userId).editAmtSpent(float(textFromUser))
-			updateDisplay(iou)
-			totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
-			bot.sendMessage(userId, totalAmtSpentFeedback)
-			iouUsageMap.pop(userId)
+		responseToCallback_EditExpense(iou, userId, textFromUser)
 
+def responseToCallback_AddExpense(iou, userId, textFromUser):
+	if not isNonNegativeFloat(textFromUser):
+		bot.sendMessage(userId, 'Please enter a valid amount')
+	else:
+		iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
+		updateDisplay(iou)
+		totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
+		bot.sendMessage(userId, totalAmtSpentFeedback)
+		iouUsageMap.pop(userId)
 
+def responseToCallback_EditExpense(iou, userId, textFromUser):
+	if not isNonNegativeFloat(textFromUser):
+		bot.sendMessage(userId, 'Please enter a valid amount')
+	else:
+		iou.getSpender(userId).editAmtSpent(float(textFromUser))
+		updateDisplay(iou)
+		totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
+		bot.sendMessage(userId, totalAmtSpentFeedback)
+		iouUsageMap.pop(userId)
+
+		
 def createNewIouMsg(iou):
 		newIouDisplayText = "A new IOU has been created\n" + iou.getInstructionalText()
 		
@@ -191,7 +196,9 @@ def formatMoney(amount):
 	return '%.2f' % amount
 
 		
-			
+
+
+		
 class Iou:
 	def __init__(self, ownerId, chatId):
 		self.__ownerId = ownerId
@@ -284,6 +291,7 @@ class Iou:
 		
 	
 		
+	
 	
 class Person:
 	def __init__(self, userId, first_name):
