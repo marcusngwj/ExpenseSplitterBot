@@ -46,7 +46,6 @@ def on_chat_message(msg):
 						
 			
 		if userId in iouUsageMap:
-			print('summer is here')
 			responseToCallback(userId, textFromUser)
 			
 
@@ -67,32 +66,10 @@ def on_callback_query(msg):
 	
 	#Switch to PM, reply bot with amount spent
 	if queryData == 'addExpense':
-		serviceType = queryData
-		idfAndService = [iouMsgIdf, serviceType]
-		iouUsageMap.update({fromId:idfAndService})
-		iou = iouMap[iouMsgIdf]
-		
-		if fromId not in iou.getSpenderList():
-			iouMap[iouMsgIdf].addSpender(person)
-		
-		bot.sendMessage(fromId, 'Send me the amount you spent.')	#Need to explore switch inline pm
+		signalCallback_addResponse(person, queryData, iouMsgIdf)
 		
 	if queryData == 'editExpense':
-		serviceType = queryData
-		idfAndService = [iouMsgIdf, serviceType]
-		iouUsageMap.update({fromId:idfAndService})
-		iou = iouMap[iouMsgIdf]
-		
-		if fromId not in iou.getSpenderList():
-			iouMap[iouMsgIdf].addSpender(person)
-		
-		if person.getAmtSpent() == 0:
-			bot.sendMessage(fromId, 'You have not spend any money so far.\nSend me the amount you spent.')
-		else:
-			expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(person.getAmtSpent()) + '.\n'
-								'This amount will be deleted.\n'
-								'Send me the new amount.')
-			bot.sendMessage(fromId, expenseEditionMsg)								
+		signalCallback_editResponse(person, queryData, iouMsgIdf)								
 		
 	if queryData == 'viewTransactions':
 		serviceType = queryData
@@ -109,6 +86,35 @@ def on_callback_query(msg):
 		
 		viewSpenders(person, iou)
 
+		
+def signalCallback_addResponse(person, queryData, iouMsgIdf):
+	serviceType = queryData
+	idfAndService = [iouMsgIdf, serviceType]
+	iouUsageMap.update({person.getUserId():idfAndService})
+	iou = iouMap[iouMsgIdf]
+	
+	if person.getUserId() not in iou.getSpenderList():
+		iouMap[iouMsgIdf].addSpender(person)
+	
+	bot.sendMessage(person.getUserId(), 'Send me the amount you spent.')	#Need to explore switch inline pm
+	
+def signalCallback_editResponse(person, queryData, iouMsgIdf):
+	serviceType = queryData
+	idfAndService = [iouMsgIdf, serviceType]
+	iouUsageMap.update({person.getUserId():idfAndService})
+	iou = iouMap[iouMsgIdf]
+	
+	if person.getUserId() not in iou.getSpenderList():
+		iouMap[iouMsgIdf].addSpender(person)
+	
+	if person.getAmtSpent() == 0:
+		bot.sendMessage(person.getUserId(), 'You have not spend any money so far.\nSend me the amount you spent.')
+	else:
+		expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(person.getAmtSpent()) + '.\n'
+							'This amount will be deleted.\n'
+							'Send me the new amount.')
+		bot.sendMessage(person.getUserId(), expenseEditionMsg)
+
 	
 def responseToCallback(userId, textFromUser):
 	idfAndService = iouUsageMap[userId]
@@ -116,12 +122,12 @@ def responseToCallback(userId, textFromUser):
 	iou = iouMap[iouMsgIdf]
 	
 	if idfAndService[SERVICE_TYPE] == 'addExpense':
-		responseToCallback_AddExpense(iou, userId, textFromUser)
+		responseToCallback_addExpense(iou, userId, textFromUser)
 	
 	if idfAndService[SERVICE_TYPE] == 'editExpense':
-		responseToCallback_EditExpense(iou, userId, textFromUser)
+		responseToCallback_editExpense(iou, userId, textFromUser)
 
-def responseToCallback_AddExpense(iou, userId, textFromUser):
+def responseToCallback_addExpense(iou, userId, textFromUser):
 	if not isNonNegativeFloat(textFromUser):
 		bot.sendMessage(userId, 'Please enter a valid amount')
 	else:
@@ -131,7 +137,7 @@ def responseToCallback_AddExpense(iou, userId, textFromUser):
 		bot.sendMessage(userId, totalAmtSpentFeedback)
 		iouUsageMap.pop(userId)
 
-def responseToCallback_EditExpense(iou, userId, textFromUser):
+def responseToCallback_editExpense(iou, userId, textFromUser):
 	if not isNonNegativeFloat(textFromUser):
 		bot.sendMessage(userId, 'Please enter a valid amount')
 	else:
