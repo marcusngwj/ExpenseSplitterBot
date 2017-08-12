@@ -32,18 +32,8 @@ def on_chat_message(msg):
 	
 	if contentType == 'text':
 		textFromUser = msg['text']
-			
-		if textFromUser == '/start':
-			bot.sendMessage(chatId, startMessage)
 		
-		elif textFromUser == '/newIOU':	
-			iou = Iou(userId, chatId)
-			createNewIouMsg(iou)
-			iouMap.update({iou.getIouMsgIdf():iou})
-			
-			owner = person
-			owner.addNewIou(iou.getIouMsgIdf(), iou)
-						
+		executeTextCommand(person, chatId, textFromUser)		
 			
 		if userId in iouUsageMap:
 			responseToCallback(userId, textFromUser)
@@ -85,6 +75,34 @@ def on_callback_query(msg):
 		iou = iouMap[iouMsgIdf]
 		
 		viewSpenders(person, iou)
+
+
+def executeTextCommand(person, chatId, textFromUser):
+	if textFromUser == '/start':
+		command_start(chatId)
+	
+	elif textFromUser == '/newIOU':	
+		command_newIOU(person, chatId)	
+		
+def command_start(chatId):
+	startMessage = "To create a new IOU, enter '/newIOU'"
+	bot.sendMessage(chatId, startMessage)
+
+def command_newIOU(person, chatId):
+	iou = Iou(person.getUserId(), chatId)
+	createNewIouMsg(iou)
+	iouMap.update({iou.getIouMsgIdf():iou})
+	
+	owner = person
+	owner.addNewIou(iou.getIouMsgIdf(), iou)
+	print('YATTA!')
+
+		
+def createNewIouMsg(iou):
+	newIouDisplayText = "A new IOU has been created\n" + iou.getInstructionalText()
+	
+	iouMsg = bot.sendMessage(iou.getChatId(), newIouDisplayText, reply_markup=getPublicKeyboard())
+	iou.setIouMsgIdf(telepot.message_identifier(iouMsg))
 
 		
 def signalCallback_addResponse(person, queryData, iouMsgIdf):
@@ -146,13 +164,6 @@ def responseToCallback_editExpense(iou, userId, textFromUser):
 		totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
 		bot.sendMessage(userId, totalAmtSpentFeedback)
 		iouUsageMap.pop(userId)
-
-		
-def createNewIouMsg(iou):
-		newIouDisplayText = "A new IOU has been created\n" + iou.getInstructionalText()
-		
-		iouMsg = bot.sendMessage(iou.getChatId(), newIouDisplayText, reply_markup=getPublicKeyboard())
-		iou.setIouMsgIdf(telepot.message_identifier(iouMsg))
 		
 
 def viewTransactions(person, iou):
@@ -345,8 +356,6 @@ class Person:
 		return self.__amtToReceive
 
 	
-startMessage = "To create a new IOU, enter '/newIOU'"
-
 bot = telepot.Bot('438370426:AAG3pe5fwtKN42TqnTel3WZ-QU4LqDP0Wos')
 
 MessageLoop(bot, {'chat': on_chat_message,
