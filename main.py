@@ -120,24 +120,34 @@ def signalCallback_addExpense(person, queryData, iouMsgIdf):
 	person.setCurrentActionType(actionType)
 	
 	iouInUse = walletInUse.getIou()
+	
 	if person.getUserId() not in iouInUse.getSpenderList():
 		iouInUse.addSpender(person)
 	
 	bot.sendMessage(person.getUserId(), 'Send me the amount you spent.')
 	
 def signalCallback_editExpense(person, queryData, iouMsgIdf):
-	serviceType = queryData
-	idfAndService = [iouMsgIdf, serviceType]
-	iouUsageMap.update({person.getUserId():idfAndService})
-	iou = iouMap[iouMsgIdf]
+	actionType = queryData
+	walletIdf = iouMsgIdf
 	
-	if person.getUserId() not in iou.getSpenderList():
-		iouMap[iouMsgIdf].addSpender(person)	############################ change person.xxx to wallet.xxx
+	if not person.hasWallet(walletIdf):
+		wallet = Wallet(iouMap[iouMsgIdf])
+		person.addWallet(walletIdf, wallet)
 	
-	if person.getAmtSpent() == 0:
+	walletInUse = person.getWallet(walletIdf)
+		
+	person.setWalletInUse(walletInUse)
+	person.setCurrentActionType(actionType)
+	
+	iouInUse = walletInUse.getIou()
+	
+	if person.getUserId() not in iouInUse.getSpenderList():
+		iouInUse.addSpender(person)
+	
+	if walletInUse.getAmtSpent() == 0:
 		bot.sendMessage(person.getUserId(), 'You have not spend any money so far.\nSend me the amount you spent.')
 	else:
-		expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(person.getAmtSpent()) + '.\n'
+		expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(walletInUse.getAmtSpent()) + '.\n'
 							'This amount will be deleted.\n'
 							'Send me the new amount.')
 		bot.sendMessage(person.getUserId(), expenseEditionMsg)
@@ -167,15 +177,19 @@ def responseToCallback_addExpense(person, textFromUser):
 		killPersonCurrentAction(person)
 		
 
-def responseToCallback_editExpense(iou, userId, textFromUser):
+def responseToCallback_editExpense(person, textFromUser):
+	userId = person.getUserId()
+	walletInUse = person.getWalletInUse()
+	iou = walletInUse.getIou()
+	
 	if not isNonNegativeFloat(textFromUser):
 		bot.sendMessage(userId, 'Please enter a valid amount')
 	else:
-		iou.getSpender(userId).editAmtSpent(float(textFromUser))
+		walletInUse.editAmtSpent(float(textFromUser))
 		updateDisplay(iou)
-		totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
+		totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(walletInUse.getAmtSpent())
 		bot.sendMessage(userId, totalAmtSpentFeedback)
-		iouUsageMap.pop(userId)
+		killPersonCurrentAction(person)
 		
 
 def killPersonCurrentAction(person):
