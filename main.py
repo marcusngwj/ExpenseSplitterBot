@@ -7,12 +7,10 @@ from telepot.loop import MessageLoop
 from telepot.namedtuple import InlineKeyboardMarkup, InlineKeyboardButton
 from telepot.namedtuple import ForceReply
 
-iouUsageMap = {}	#Map user to currently using iou (userId:(iouMsgIdf, serviceType))
-iouMap = {}			#Map iou to respective message_identifier (msgIdf:iou)
+
+iouMap = {}			#Map iou to respective message_identifier (iouMsgIdf:iou)
 userMap = {}		#Map user to userid (userId:person)
 
-IOU_MSG_IDF = 0
-SERVICE_TYPE = 1
 
 def on_chat_message(msg):
 	contentType, chatType, chatId = telepot.glance(msg)
@@ -26,49 +24,18 @@ def on_chat_message(msg):
 		userMap.update({userId:person})
 	else:
 		person = userMap[userId]
+
 		
 	if contentType != 'text':
 		return
 	
 	if contentType == 'text':
 		textFromUser = msg['text']
-			
-		if textFromUser == '/start':
-			bot.sendMessage(chatId, startMessage)
 		
-		elif textFromUser == '/newIOU':	
-			iou = Iou(userId, chatId)
-			createNewIouMsg(iou)
-			iouMap.update({iou.getIouMsgIdf():iou})
+		executeTextCommand(person, chatId, textFromUser)		
 			
-			owner = person
-			owner.addNewIou(iou.getIouMsgIdf(), iou)
-						
-			
-		if userId in iouUsageMap:
-			idfAndService = iouUsageMap[userId]
-			iouMsgIdf = idfAndService[IOU_MSG_IDF]
-			iou = iouMap[iouMsgIdf]
-			
-			if idfAndService[SERVICE_TYPE] == 'addExpense':
-				if not isNonNegativeFloat(textFromUser):
-					bot.sendMessage(userId, 'Please enter a valid amount')
-				else:
-					iou.getSpender(userId).increaseAmtSpent(float(textFromUser))
-					updateDisplay(iou)
-					totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
-					bot.sendMessage(userId, totalAmtSpentFeedback)
-					iouUsageMap.pop(userId)
-			
-			if idfAndService[SERVICE_TYPE] == 'editExpense':
-				if not isNonNegativeFloat(textFromUser):
-					bot.sendMessage(userId, 'Please enter a valid amount')
-				else:
-					iou.getSpender(userId).editAmtSpent(float(textFromUser))
-					updateDisplay(iou)
-					totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(iou.getSpender(userId).getAmtSpent())
-					bot.sendMessage(userId, totalAmtSpentFeedback)
-					iouUsageMap.pop(userId)
+		if person.getCurrentActionType() != None:
+			responseToCallback(person, textFromUser)
 			
 
 def on_callback_query(msg):
@@ -79,88 +46,170 @@ def on_callback_query(msg):
 	print('From: ', fromFirstName, ' (', fromId, ')')
 	print('Query ID: ', queryId)
 	print('MsgIdf: ', iouMsgIdf, '\n')
-	
+		
 	if fromId not in userMap:
 		person = Person(fromId, msg['from']['first_name'])
 		userMap.update({fromId:person})
 	else:
 		person = userMap[fromId]
-	
+		
 	#Switch to PM, reply bot with amount spent
 	if queryData == 'addExpense':
-		serviceType = queryData
-		idfAndService = [iouMsgIdf, serviceType]
-		iouUsageMap.update({fromId:idfAndService})
-		iou = iouMap[iouMsgIdf]
-		
-		if fromId not in iou.getSpenderList():
-			iouMap[iouMsgIdf].addSpender(person)
-		
-		bot.sendMessage(fromId, 'Send me the amount you spent.')	#Need to explore switch inline pm
+		signalCallback_addExpense(person, queryData, iouMsgIdf)
 		
 	if queryData == 'editExpense':
-		serviceType = queryData
-		idfAndService = [iouMsgIdf, serviceType]
-		iouUsageMap.update({fromId:idfAndService})
-		iou = iouMap[iouMsgIdf]
-		
-		if fromId not in iou.getSpenderList():
-			iouMap[iouMsgIdf].addSpender(person)
-		
-		if person.getAmtSpent() == 0:
-			bot.sendMessage(fromId, 'You have not spend any money so far.\nSend me the amount you spent.')
-		else:
-			expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(person.getAmtSpent()) + '.\n'
-								'This amount will be deleted.\n'
-								'Send me the new amount.')
-			bot.sendMessage(fromId, expenseEditionMsg)
-			
-									
-		
-	if queryData == 'viewTransactions':
-		serviceType = queryData
-		idfAndService = [iouMsgIdf, serviceType]
-		iouUsageMap.update({fromId:idfAndService})
-		iou = iouMap[iouMsgIdf]
-		
-		viewTransactions(person, iou)
+		signalCallback_editExpense(person, queryData, iouMsgIdf)								
 	
 	if queryData == 'viewSpenders':	
-		idfAndService = iouUsageMap[fromId]
-		iouMsgIdf = idfAndService[IOU_MSG_IDF]
-		iou = iouMap[iouMsgIdf]
+		signalCallback_viewSpenders(person, queryData, iouMsgIdf)
+
+
+def executeTextCommand(person, chatId, textFromUser):
+	if textFromUser == '/start':
+		command_start(chatId)
+	
+	elif textFromUser == '/newIOU':	
+		command_newIOU(person, chatId)	
 		
-		viewSpenders(person, iou)
+def command_start(chatId):
+	startMessage = "To create a new IOU, enter '/newIOU'"
+	bot.sendMessage(chatId, startMessage)
+
+def command_newIOU(person, chatId):
+	iou = createNewIou(person, chatId)
+	putIouInWallet(person, iou)
+	
+	
+def createNewIou(person, chatId):
+	iou = Iou(person.getUserId(), chatId)
+	newIouDisplayText = "A new IOU has been created\n" + iou.getInstructionalText()
+	iouMsg = bot.sendMessage(chatId, newIouDisplayText, reply_markup=getPublicKeyboard())
+	iou.setIouMsgIdf(telepot.message_identifier(iouMsg))
+	iouMap.update({iou.getIouMsgIdf():iou})
+	return iou
+	
+def putIouInWallet(person, iou):
+	wallet = Wallet(iou)
+	person.addWallet(iou.getIouMsgIdf(), wallet)
+	return wallet
 
 		
-def createNewIouMsg(iou):
-		newIouDisplayText = "A new IOU has been created\n" + iou.getInstructionalText()
+def signalCallback_addExpense(person, queryData, iouMsgIdf):
+	actionType = queryData
+	walletIdf = iouMsgIdf
+	
+	if not person.hasWallet(walletIdf):
+		wallet = Wallet(iouMap[iouMsgIdf])
+		person.addWallet(walletIdf, wallet)
+	
+	walletInUse = person.getWallet(walletIdf)
 		
-		iouMsg = bot.sendMessage(iou.getChatId(), newIouDisplayText, reply_markup=getPublicKeyboard())
-		iou.setIouMsgIdf(telepot.message_identifier(iouMsg))
+	person.setWalletInUse(walletInUse)
+	person.setCurrentActionType(actionType)
+	
+	iouInUse = walletInUse.getIou()
+	
+	if person.getUserId() not in iouInUse.getSpenderList():
+		iouInUse.addSpender(person)
+	
+	bot.sendMessage(person.getUserId(), 'Send me the amount you spent.')
+	
+def signalCallback_editExpense(person, queryData, iouMsgIdf):
+	actionType = queryData
+	walletIdf = iouMsgIdf
+	
+	if not person.hasWallet(walletIdf):
+		wallet = Wallet(iouMap[iouMsgIdf])
+		person.addWallet(walletIdf, wallet)
+	
+	walletInUse = person.getWallet(walletIdf)
 		
-
-def viewTransactions(person, iou):
-	keyboard = InlineKeyboardMarkup(inline_keyboard=[
-					[InlineKeyboardButton(text='View list of spenders', callback_data='viewSpenders')],
-					[InlineKeyboardButton(text='View list of payers', callback_data='viewPayers')],
-				])
-				
-	if person.getUserId() == iou.getChatId():	#If user is already in private chat with bot
-		bot.sendMessage(person.getUserId(), 'Kindly choose from the following services', reply_markup=keyboard)	
+	person.setWalletInUse(walletInUse)
+	person.setCurrentActionType(actionType)
+	
+	iouInUse = walletInUse.getIou()
+	
+	if person.getUserId() not in iouInUse.getSpenderList():
+		iouInUse.addSpender(person)
+	
+	if walletInUse.getAmtSpent() == 0:
+		bot.sendMessage(person.getUserId(), 'You have not spend any money so far.\nSend me the amount you spent.')
 	else:
-		transactionInitMsg = 'A list of transaction services have been sent to ' + person.getFirstName() + ' via PM'
-		bot.sendMessage(iou.getChatId(), transactionInitMsg)
-		bot.sendMessage(person.getUserId(), 'Kindly choose from the following services', reply_markup=keyboard)	
+		expenseEditionMsg = ('You previously declared that you spent $' + formatMoney(walletInUse.getAmtSpent()) + '.\n'
+							'This amount will be deleted.\n'
+							'Send me the new amount.')
+		bot.sendMessage(person.getUserId(), expenseEditionMsg)
+	
+def signalCallback_viewSpenders(person, queryData, iouMsgIdf):
+	actionType = queryData
+	walletIdf = iouMsgIdf
+	
+	if not person.hasWallet(walletIdf):
+		wallet = Wallet(iouMap[iouMsgIdf])
+		person.addWallet(walletIdf, wallet)
+	
+	walletInUse = person.getWallet(walletIdf)
+		
+	person.setWalletInUse(walletInUse)
+	person.setCurrentActionType(actionType)
+	
+	iouInUse = walletInUse.getIou()
+	
+	if person.getUserId() == iouInUse.getChatId():	#If user is already in private chat with bot
+		bot.sendMessage(person.getUserId(), iouInUse.getDisplaySpender())	
+	else:
+		transactionInitMsg = 'A list of spenders have been sent to ' + person.getFirstName() + ' via PM'
+		bot.sendMessage(iouInUse.getChatId(), transactionInitMsg)
+		bot.sendMessage(person.getUserId(), iouInUse.getDisplaySpender())
+
+	
+def responseToCallback(person, textFromUser):
+	actionType = person.getCurrentActionType()
+	
+	if actionType == 'addExpense':
+		responseToCallback_addExpense(person, textFromUser)
+	
+	if actionType == 'editExpense':
+		responseToCallback_editExpense(person, textFromUser)
+
+def responseToCallback_addExpense(person, textFromUser):
+	userId = person.getUserId()
+	walletInUse = person.getWalletInUse()
+	iou = walletInUse.getIou()
+	
+	if not isNonNegativeFloat(textFromUser):
+		bot.sendMessage(userId, 'Please enter a valid amount')
+	else:
+		walletInUse.increaseAmtSpent(float(textFromUser))		
+		updateDisplay(iou)
+		totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(walletInUse.getAmtSpent())
+		bot.sendMessage(userId, totalAmtSpentFeedback)
+		killPersonCurrentAction(person)
 		
 
-def viewSpenders(person, iou):
-	bot.sendMessage(person.getUserId(), iou.getDisplaySpender())
+def responseToCallback_editExpense(person, textFromUser):
+	userId = person.getUserId()
+	walletInUse = person.getWalletInUse()
+	iou = walletInUse.getIou()
+	
+	if not isNonNegativeFloat(textFromUser):
+		bot.sendMessage(userId, 'Please enter a valid amount')
+	else:
+		walletInUse.editAmtSpent(float(textFromUser))
+		updateDisplay(iou)
+		totalAmtSpentFeedback = 'You have spent a total of $' + formatMoney(walletInUse.getAmtSpent())
+		bot.sendMessage(userId, totalAmtSpentFeedback)
+		killPersonCurrentAction(person)
+		
+
+def killPersonCurrentAction(person):
+	person.setWalletInUse(None)
+	person.setCurrentActionType(None)
 	
 
 def updateDisplay(iou):
-		iouDisplayText = iou.getDisplayTotalExpenses() + iou.getDisplayReceivePay() + iou.getInstructionalText()
-		bot.editMessageText(iou.getIouMsgIdf(), iouDisplayText, reply_markup=getPublicKeyboard())
+	iouDisplayText = iou.getDisplayTotalExpenses() + iou.getDisplayReceivePay() + iou.getInstructionalText()
+	bot.editMessageText(iou.getIouMsgIdf(), iouDisplayText, reply_markup=getPublicKeyboard())
 
 
 def getPublicKeyboard():
@@ -168,7 +217,7 @@ def getPublicKeyboard():
 					[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 					[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 					[InlineKeyboardButton(text='Edit expense', callback_data='editExpense')],
-					[InlineKeyboardButton(text='View transactions', callback_data='viewTransactions')],
+					[InlineKeyboardButton(text='View spenders', callback_data='viewSpenders')],
 				])
 	return keyboard
 			
@@ -187,7 +236,9 @@ def formatMoney(amount):
 	return '%.2f' % amount
 
 		
-			
+
+
+		
 class Iou:
 	def __init__(self, ownerId, chatId):
 		self.__ownerId = ownerId
@@ -204,10 +255,12 @@ class Iou:
 		self.__spenderList.update({person.getUserId():person})
 		
 	def __computeTotalExpenses(self):
-		total = 0
+		totalExpenses = 0
+		
 		for userId, person in self.__spenderList.items():
-			total += person.getAmtSpent()
-		return total
+			wallet = self.__getWalletFromPerson(person)
+			totalExpenses += wallet.getAmtSpent()
+		return totalExpenses
 	
 	#Compute amount a person supposed to pay
 	def __computeExpectedAmtToPay(self):
@@ -219,18 +272,25 @@ class Iou:
 		expectedAmtToPay = self.__computeExpectedAmtToPay()
 		for userId, person in self.__spenderList.items():
 			self.__resetAmtToReceivePay(person)
-			shortfallAmt = expectedAmtToPay - person.getAmtSpent()
+			wallet = self.__getWalletFromPerson(person)
+			shortfallAmt = expectedAmtToPay - wallet.getAmtSpent()
 			if shortfallAmt > 0:
-				person.setAmtToPay(shortfallAmt)
+				wallet.setAmtToPay(shortfallAmt)
 			else:
-				person.setAmtToReceive((-1)*shortfallAmt)
+				wallet.setAmtToReceive((-1)*shortfallAmt)
 				
 	def __resetAmtToReceivePay(self, person):
-		person.setAmtToReceive(0)
-		person.setAmtToPay(0)
+		wallet = self.__getWalletFromPerson(person)
+		wallet.setAmtToReceive(0)
+		wallet.setAmtToPay(0)
 				
 	def setIouMsgIdf(self, iouMsgIdf):
 		self.__iouMsgIdf = iouMsgIdf
+		
+	def __getWalletFromPerson(self, person):
+		walletIdf = self.__iouMsgIdf
+		wallet = person.getWallet(walletIdf)
+		return wallet
 		
 	def getChatId(self):
 		return self.__chatId
@@ -263,7 +323,8 @@ class Iou:
 		display = ''
 		for userId, person in self.__spenderList.items():
 			name = person.getFirstName()
-			amtSpent = person.getAmtSpent()
+			wallet = self.__getWalletFromPerson(person)
+			amtSpent = wallet.getAmtSpent()
 			display += name + ' spent $' + formatMoney(amtSpent) + '\n'
 		
 		return display
@@ -272,29 +333,69 @@ class Iou:
 		self.__computeReceivePay()
 		display = ''
 		for userId, person in self.__spenderList.items():
-			if person.getAmtToPay() != 0:
-				display += person.getFirstName() + ' needs to pay $' + formatMoney(person.getAmtToPay()) + '\n'
-			elif person.getAmtToReceive() != 0:
-				display += person.getFirstName() + ' needs to receive $' + formatMoney(person.getAmtToReceive()) + '\n'
+			wallet = self.__getWalletFromPerson(person)
+			if wallet.getAmtToPay() != 0:
+				display += person.getFirstName() + ' needs to pay $' + formatMoney(wallet.getAmtToPay()) + '\n'
+			elif wallet.getAmtToReceive() != 0:
+				display += person.getFirstName() + ' needs to receive $' + formatMoney(wallet.getAmtToReceive()) + '\n'
 		return display
 		
 	
 		
+	
 	
 class Person:
 	def __init__(self, userId, first_name):
 		self.__userId = userId
 		self.__firstName = first_name
 		
+		self.__currentWallet = None
+		self.__currentActionType = None
+		
+		self.__walletList = {}	#(walletIdf: wallet), walletIdf == iouMsgIdf
+	
+	def addWallet(self, walletIdf, wallet):
+		self.__walletList.update({walletIdf:wallet})
+		
+	def setWalletInUse(self, wallet):
+		self.__currentWallet = wallet
+		
+	def setCurrentActionType(self, service):
+		self.__currentActionType = service
+		
+	def getUserId(self):
+		return self.__userId
+		
+	def getFirstName(self):
+		return self.__firstName
+		
+	def getWallet(self, walletIdf):
+		return self.__walletList[walletIdf]
+		
+	def getWalletInUse(self):
+		return self.__currentWallet
+	
+	def getCurrentActionType(self):
+		return self.__currentActionType
+		
+	def hasWallet(self, walletIdf):
+		return walletIdf in self.__walletList
+
+
+
+
+
+class Wallet:
+	def __init__(self, iou):
+		self.__iou = iou
+		
 		self.__amtSpent = 0
 		self.__amtPaid = 0
 		self.__amtToPay = 0
 		self.__amtToReceive = 0
-		
-		self.__iouListOwned = {}
 	
-	def addNewIou(self, iouMsgIdf, iou):
-		self.__iouListOwned.update({iouMsgIdf:iou})
+	def insertIou(self, iou):
+		self.__iou = iou
 		
 	def increaseAmtSpent(self, amount):
 		self.__amtSpent += amount
@@ -308,11 +409,8 @@ class Person:
 	def setAmtToReceive(self, amount):
 		self.__amtToReceive = amount
 		
-	def getUserId(self):
-		return self.__userId
-		
-	def getFirstName(self):
-		return self.__firstName
+	def getIou(self):
+		return self.__iou
 		
 	def getAmtSpent(self):
 		return self.__amtSpent
@@ -325,10 +423,9 @@ class Person:
 		
 	def getAmtToReceive(self):
 		return self.__amtToReceive
+		
 
 	
-startMessage = "To create a new IOU, enter '/newIOU'"
-
 bot = telepot.Bot('438370426:AAG3pe5fwtKN42TqnTel3WZ-QU4LqDP0Wos')
 
 MessageLoop(bot, {'chat': on_chat_message,
