@@ -59,21 +59,9 @@ def on_callback_query(msg):
 		
 	if queryData == 'editExpense':
 		signalCallback_editExpense(person, queryData, iouMsgIdf)								
-		
-	if queryData == 'viewTransactions':
-		serviceType = queryData
-		idfAndService = [iouMsgIdf, serviceType]
-		iouUsageMap.update({fromId:idfAndService})
-		iou = iouMap[iouMsgIdf]
-		
-		viewTransactions(person, iou)
 	
 	if queryData == 'viewSpenders':	
-		idfAndService = iouUsageMap[fromId]
-		iouMsgIdf = idfAndService[IOU_MSG_IDF]
-		iou = iouMap[iouMsgIdf]
-		
-		viewSpenders(person, iou)
+		signalCallback_viewSpenders(person, queryData, iouMsgIdf)
 
 
 def executeTextCommand(person, chatId, textFromUser):
@@ -151,6 +139,28 @@ def signalCallback_editExpense(person, queryData, iouMsgIdf):
 							'This amount will be deleted.\n'
 							'Send me the new amount.')
 		bot.sendMessage(person.getUserId(), expenseEditionMsg)
+	
+def signalCallback_viewSpenders(person, queryData, iouMsgIdf):
+	actionType = queryData
+	walletIdf = iouMsgIdf
+	
+	if not person.hasWallet(walletIdf):
+		wallet = Wallet(iouMap[iouMsgIdf])
+		person.addWallet(walletIdf, wallet)
+	
+	walletInUse = person.getWallet(walletIdf)
+		
+	person.setWalletInUse(walletInUse)
+	person.setCurrentActionType(actionType)
+	
+	iouInUse = walletInUse.getIou()
+	
+	if person.getUserId() == iouInUse.getChatId():	#If user is already in private chat with bot
+		bot.sendMessage(person.getUserId(), iouInUse.getDisplaySpender())	
+	else:
+		transactionInitMsg = 'A list of spenders have been sent to ' + person.getFirstName() + ' via PM'
+		bot.sendMessage(iouInUse.getChatId(), transactionInitMsg)
+		bot.sendMessage(person.getUserId(), iouInUse.getDisplaySpender())
 
 	
 def responseToCallback(person, textFromUser):
@@ -195,24 +205,6 @@ def responseToCallback_editExpense(person, textFromUser):
 def killPersonCurrentAction(person):
 	person.setWalletInUse(None)
 	person.setCurrentActionType(None)
-		
-
-def viewTransactions(person, iou):
-	keyboard = InlineKeyboardMarkup(inline_keyboard=[
-					[InlineKeyboardButton(text='View list of spenders', callback_data='viewSpenders')],
-					[InlineKeyboardButton(text='View list of payers', callback_data='viewPayers')],
-				])
-				
-	if person.getUserId() == iou.getChatId():	#If user is already in private chat with bot
-		bot.sendMessage(person.getUserId(), 'Kindly choose from the following services', reply_markup=keyboard)	
-	else:
-		transactionInitMsg = 'A list of transaction services have been sent to ' + person.getFirstName() + ' via PM'
-		bot.sendMessage(iou.getChatId(), transactionInitMsg)
-		bot.sendMessage(person.getUserId(), 'Kindly choose from the following services', reply_markup=keyboard)	
-		
-
-def viewSpenders(person, iou):
-	bot.sendMessage(person.getUserId(), iou.getDisplaySpender())
 	
 
 def updateDisplay(iou):
@@ -225,7 +217,7 @@ def getPublicKeyboard():
 					[InlineKeyboardButton(text='Share IOU', callback_data='share')],
 					[InlineKeyboardButton(text='Add expense', callback_data='addExpense')],
 					[InlineKeyboardButton(text='Edit expense', callback_data='editExpense')],
-					[InlineKeyboardButton(text='View transactions', callback_data='viewTransactions')],
+					[InlineKeyboardButton(text='View spenders', callback_data='viewSpenders')],
 				])
 	return keyboard
 			
